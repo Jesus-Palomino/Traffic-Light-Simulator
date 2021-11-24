@@ -21,7 +21,7 @@ class Semaphore(ap.Agent):
 
         self.green_duration = 50     # Tiempo que dura el semaforo en verde
         self.yellow_duration = 5     # Tiempo que dura el semaforo en amarillo
-        self.red_duration = 45       # Tiempo que dura el semaforo en rojo
+        self.red_duration = 60       # Tiempo que dura el semaforo en rojo
 
     def update(self):
         # """ Este mwtodo actualiza el estado del semaforo. """
@@ -42,22 +42,6 @@ class Semaphore(ap.Agent):
             if self.state_time >= self.red_duration:
                 self.state = 0
                 self.state_time = 0
-
-    def set_green(self):
-        # """ Este metodo forza el semaforo a estar en verde. """
-        self.state = 0
-        self.state_time = 0
-        self.green_duration = random.randint(40, 120)
-
-    def set_yellow(self):
-        # """ Este metodo forza el semaforo a estar en amarillo. """
-        self.state = 1
-        self.state_time = 0
-
-    def set_red(self):
-        # """ Este metodo forza el semaforo a estar en rojo. """
-        self.state = 2
-        self.state_time = 0
 
 
 class Car(ap.Agent):
@@ -143,32 +127,32 @@ class Car(ap.Agent):
                     semaphore_state = semaphore.state
 
         # Actualiza la velocidad del auto
-        if min_car_distance < 2:
+        if min_car_distance < 20:
             self.speed = 0
             self.state = 1
             crashed_car.speed = 0
             crashed_car.state = 1
 
-        elif min_car_distance < 20:
+        elif min_car_distance < 70:
             self.speed = np.maximum(self.speed - 250*self.step_time, 0)
 
-        elif min_car_distance < 110:
+        elif min_car_distance < 150:
             self.speed = np.maximum(self.speed - 80*self.step_time, 0)
 
-        elif min_semaphore_distance < 30 and semaphore_state == 1:
+        elif min_semaphore_distance < 60 and semaphore_state == 1:
             self.speed = np.minimum(
                 self.speed + 5*self.step_time, self.max_speed)
 
-        elif min_semaphore_distance < 50 and semaphore_state == 1:
+        elif min_semaphore_distance < 120 and semaphore_state == 1:
             self.speed = np.maximum(self.speed - 20*self.step_time, 0)
 
         elif self.speed <= 10 and min_car_distance == 1000000 and (semaphore_state == 2 or semaphore_state == 1):
-            if(min_semaphore_distance > 30 and self.speed != 10):
+            if(min_semaphore_distance > 60 and self.speed != 10):
                 self.speed = np.minimum(self.speed + 50*self.step_time, 10)
             else:
                 self.speed = np.maximum(self.speed - 250*self.step_time, 0)
 
-        elif min_semaphore_distance < 100 and semaphore_state == 2:
+        elif min_semaphore_distance < 200 and semaphore_state == 2:
             self.speed = np.maximum(self.speed - 80*self.step_time, 0)
 
         else:
@@ -208,8 +192,8 @@ class AvenueModel(ap.Model):
 
         # Agrega los semaforos al entorno
         self.avenue.add_agents(self.semaphores, random=True)
-        self.avenue.move_to(self.semaphores[0], [65, self.p.size*0.5 + 30])
-        self.avenue.move_to(self.semaphores[1], [235, self.p.size*0.5 - 30])
+        self.avenue.move_to(self.semaphores[0], [65, self.p.size*0.5 + 60])
+        self.avenue.move_to(self.semaphores[1], [235, self.p.size*0.5 - 60])
 
         # Agrega los autos al entorno
         self.avenue.add_agents(self.cars, random=True)
@@ -241,13 +225,13 @@ class AvenueModel(ap.Model):
                 'x': self.model.avenue.positions[self.cars[k]][0],
                 'z': self.model.avenue.positions[self.cars[k]][1],
                 'dir': math.atan2(self.cars[k].direction[0], self.cars[k].direction[1]) * 180 / math.pi,
-                'type': random.randint(0, 4)
+                'type': random.randint(0, 6)
             })
 
         # Carga de semaforos
         for k in range(len(self.semaphores)):
             self.data['semaphores'].append({
-                'id': k,
+                'id': k + model.p.cars,
                 'x': self.model.avenue.positions[self.semaphores[k]][0],
                 'z': self.model.avenue.positions[self.semaphores[k]][1],
                 'dir': math.atan2(self.semaphores[k].direction[0], self.semaphores[k].direction[1]) * 180 / math.pi,
@@ -260,6 +244,8 @@ class AvenueModel(ap.Model):
         self.cars.update_position()
         self.cars.update_speed()
 
+        green_duration = self.semaphores[0].green_duration
+
         car_list = []
         for k in range(self.p.cars):
             car_list.append({
@@ -271,9 +257,10 @@ class AvenueModel(ap.Model):
         sempahore_list = []
         for k in range(len(self.semaphores)):
             sempahore_list.append({
-                'id': k,
+                'id': k + model.p.cars,
                 'state': self.semaphores[k].state
             })
+            self.semaphores[k].green_duration = green_duration
 
         self.data['frames'].append({
             'frame': self.frames,
@@ -290,9 +277,9 @@ class AvenueModel(ap.Model):
 
 
 parameters = {
-    'step_time': 0.1,    # Procentaje de area cubierta por arboles
-    'size': 1500,        # Tamano en metros de la avenida
-    'green': 2,          # Duracion de la luz verde
+    'step_time': 0.1,    # Tiempo de step
+    'size': 2000,        # Tamano en metros de la avenida
+    'green': 15,          # Duracion de la luz verde
     'yellow': 5,         # Duracion de la luz amarilla
     'red': 10,           # Duracion de la luz roja
     'cars': 20,          # Numero de autos en la simulacion

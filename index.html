@@ -87,12 +87,24 @@
                     const x =  data.cars[i].x;
                     const z =  data.cars[i].z;
                     const dir = data.cars[i].dir;
+                    const type = data.cars[i].type;
 
-                    var car = createCar();
+                    var car = createCar(type);
                     car.position.set(x, 0, z);
                     car.rotation.y = dir * Math.PI / 180;
                     car.name = id;
                     scene.add(car);
+                }
+                for(let i = 0; i < data.semaphores.length; i++){
+                    const id =  data.semaphores[i].id;
+                    const x =  data.semaphores[i].x;
+                    const z =  data.semaphores[i].z;
+                    const dir = data.semaphores[i].dir;
+                    const state = data.semaphores[i].state;
+
+                    var semaphore = new Cube(x, z, dir, state, 20);
+                    semaphore.name = id;
+                    scene.add(semaphore);
                 }
                 dataReady = true;
             });
@@ -105,7 +117,7 @@
             stats.begin();
             setTimeout( function() {
             requestAnimationFrame( renderLoop);
-            }, 1000 / 10 );
+            }, 1000 / 30 );
             renderer.render(scene, camera);
             updateScene();
             stats.end();
@@ -134,6 +146,20 @@
                         } else{
                             car.position.set(x, 0, z);
                             car.rotation.y = dir * Math.PI / 180;
+                        }
+                    }
+                    for(let i = 0; i < data.frames[frame].semaphores.length; i++){
+                        
+                        const id =  data.frames[frame].semaphores[i].id;
+                        const state = data.frames[frame].semaphores[i].state;
+                        var semaphore = scene.getObjectByName(id);
+
+                        if(!semaphore){
+                            var semaphore = new Cube();
+                            semaphore.name = id;
+                            scene.add(semaphore);
+                        } else{
+                            semaphore.setState(state);
                         }
                     }
                     frame++;
@@ -198,7 +224,9 @@
             }
         }
 
-        function createCar() {
+        function createCar(value = 0) {
+            var colors = [0xa52523, 0xffffff, 0x00008B, 0x000000, 0x0080000, 0x808080, 0xffa500];
+
             const car = new THREE.Group();
 
             const backWheel = createWheels();
@@ -213,7 +241,7 @@
 
             const main = new THREE.Mesh(
                 new THREE.BoxBufferGeometry(60, 15, 30),
-                new THREE.MeshLambertMaterial({ color: 0xa52523 })
+                new THREE.MeshLambertMaterial({ color: colors[value] })
             );
             main.position.y = 12;
             car.add(main);
@@ -280,6 +308,65 @@
             context.fillRect(58, 8, 60, 24);
 
             return new THREE.CanvasTexture(canvas);
+        }
+
+        class Cube extends THREE.Mesh{
+            constructor(x = 0, z = 0, rotation = 0, state = 0, size = 1, color = 0xcc0000){
+                super(new THREE.BoxGeometry(size, size, size), new THREE.MeshBasicMaterial({color}));
+                this.x = x;
+                this.z = z;
+                this.position.set(x, 50, z);
+            }
+            setState(value){
+                if (value == 0){
+                    this.material.color.setHex('0x00ff00');
+                }
+                if (value == 1){
+                    this.material.color.setHex('0xffff00');
+                }
+                if (value == 2){
+                    this.material.color.setHex('0xcc0000');
+                }
+            }
+        }
+
+        class Semaphore extends THREE.Group {
+            constructor(x = 0, z = 0, rotation = 0, state = 0, size = 1, color = 0xcc0000, wireColor = 0xffffff) {
+            super(new THREE.BoxGeometry(size, size, size), new THREE.MeshBasicMaterial({color}));
+            this.x = x;
+            this.z = z;
+            this.position.set(x, 50, z);
+            this.rotation.y = rotation * Math.PI / 180;
+            this.size = size;
+            this.color = color;
+            this.wireColor = wireColor;
+            this.doubleSide = false;
+            this.rotate = false;
+            const geometry = new THREE.BoxGeometry(size, size, size);
+            const material = new THREE.MeshBasicMaterial({color});
+            const materialWire = new THREE.MeshBasicMaterial({wireframe: true, color: wireColor});
+            this.solid = new THREE.Mesh(geometry, material);
+            this.wire = new THREE.Mesh(geometry, materialWire);                
+            // CHILDREN
+            this.add(this.solid);
+            this.add(this.wire);
+            }
+
+            setState(value){
+                this.solid.traverse(function(child) {
+                                if (child.isMesh) {
+                                    if (value == 0){
+                                        child.material.color.setHex(0x00ff00);
+                                    }
+                                    if (value == 1){
+                                        child.material.color.setHex(0xffff00);
+                                    }
+                                    if (value == 2){
+                                        child.material.color.setHex(0xcc0000);
+                                    }
+                                }
+                });
+            }
         }
 
         class Building extends THREE.Group {
