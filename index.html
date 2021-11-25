@@ -26,7 +26,7 @@
         "use strict";
 
         let renderer, scene, camera, orbitControls, stats, gui, data, dataReady = false, frame = 0;
-        let street, streetLines, buildings;
+        let street, streetLines, buildings, cars;
         
         function init(event) {
             // RENDERER ENGINE
@@ -45,6 +45,7 @@
             const street = new Street(2600, 1000, 130, 1200);
             const streetLines = new StreetLines();
             const buildings = new Buildings();
+            const cars = new Cars();
 
             // LIGHTS
             var ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -75,7 +76,7 @@
             guiSceneMenu.add(scenary.axes, "visible").setValue(scenary.axes.visible).name("World Axes").listen().onChange(function(value) {
                 scenary.axes.setVisible(value);
             });
-            guiSceneMenu.open();
+            // BUILDINGS-MENU
             const guiBuildings = gui.addFolder("Buildings");
             guiBuildings.add(buildings, "textures").setValue(true).name("Textures").listen().onChange(function(value) {
                 buildings.setTextures(value);
@@ -86,7 +87,6 @@
             guiBuildings.addColor(buildings, 'color').setValue(buildings.color).name('Color').listen().onChange(function (value) {
                 buildings.setColor(value);
             });
-            guiSceneMenu.open();
             // CAMERA-MENU
             const guiVirtuaCameraMenu = gui.addFolder("Virtual Camera");
             guiVirtuaCameraMenu.add(camera, "perspectiveView").setValue(camera.perspectiveView).name("Perspective View").listen().onChange(function(value) {
@@ -97,6 +97,11 @@
             });
             guiVirtuaCameraMenu.add(camera, "modelInteriorView").setValue(camera.modelInteriorView).name("Model Interior View").listen().onChange(function(value) {
                 camera.setModelInteriorView(value);
+            });
+            // CARS-MENU
+            const guiCarsMenu = gui.addFolder("Cars");
+            guiCarsMenu.add(cars, "carWireframes").setValue(cars.carWireframes).name("Wireframes").listen().onChange(function(value) {
+                cars.setCarWireframes(value);
             });
 
             // READ JSON DATA
@@ -220,6 +225,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);            
         }, false);
 
+
         class Camera extends THREE.PerspectiveCamera {
             constructor(fov = 60, aspect = window.innerWidth / window.innerHeight, near = 0.01, far = 10000){
                 super(fov, aspect, near, far);
@@ -294,6 +300,32 @@
             }
         }
 
+        class Cars extends THREE.Mesh {
+            constructor(carWireframes = false){
+                super();
+                this.carWireframes = carWireframes
+            }
+            setCarWireframes(value){
+                
+                for(let i = 0; i < data.cars.length; i++){
+                    scene.remove(scene.getObjectByName(i));
+                    const id =  data.cars[i].id;
+                    const type = data.cars[i].type;
+                    if(value){
+                        var car = createCar(type, true);
+                        car.name = id;
+                        scene.add(car);
+                    }
+                    else{
+                        var car = createCar(type);
+                        car.name = id;
+                        scene.add(car);
+                    }
+
+                }
+            }
+        }
+
         class Street extends THREE.Group {
             constructor(xSize = 100, ySize = 100, x = 0, z = 0) {
                 super();
@@ -317,7 +349,7 @@
             }
         }
 
-        function createCar(value = 0) {
+        function createCar(value = 0, wireframe = false) {
             var colors = [0xa52523, 0xffffff, 0x00008B, 0x000000, 0x0080000, 0x808080, 0xffa500];
 
             const car = new THREE.Group();
@@ -325,11 +357,13 @@
             const backWheel = createWheels();
             backWheel.position.y = 6;
             backWheel.position.x = -18;
+            backWheel.material.wireframe = wireframe;
             car.add(backWheel);
 
             const frontWheel = createWheels();
             frontWheel.position.y = 6;
             frontWheel.position.x = 18;
+            frontWheel.material.wireframe = wireframe;
             car.add(frontWheel);
 
             const main = new THREE.Mesh(
@@ -337,30 +371,43 @@
                 new THREE.MeshLambertMaterial({ color: colors[value] })
             );
             main.position.y = 12;
+            main.material.wireframe = wireframe;
             car.add(main);
 
-            const carFrontTexture = getCarFrontTexture();
+            if(!wireframe){
+                const carFrontTexture = getCarFrontTexture();
 
-            const carBackTexture = getCarFrontTexture();
+                const carBackTexture = getCarFrontTexture();
 
-            const carRightSideTexture = getCarSideTexture();
+                const carRightSideTexture = getCarSideTexture();
 
-            const carLeftSideTexture = getCarSideTexture();
-            carLeftSideTexture.center = new THREE.Vector2(0.5, 0.5);
-            carLeftSideTexture.rotation = Math.PI;
-            carLeftSideTexture.flipY = false;
+                const carLeftSideTexture = getCarSideTexture();
+                carLeftSideTexture.center = new THREE.Vector2(0.5, 0.5);
+                carLeftSideTexture.rotation = Math.PI;
+                carLeftSideTexture.flipY = false;
 
-            const cabin = new THREE.Mesh(new THREE.BoxBufferGeometry(33, 12, 24), [
-                new THREE.MeshLambertMaterial({ map: carFrontTexture }),
-                new THREE.MeshLambertMaterial({ map: carBackTexture }),
-                new THREE.MeshLambertMaterial({ color: 0xffffff }), // top
-                new THREE.MeshLambertMaterial({ color: 0xffffff }), // bottom
-                new THREE.MeshLambertMaterial({ map: carRightSideTexture }),
-                new THREE.MeshLambertMaterial({ map: carLeftSideTexture }),
-            ]);
-            cabin.position.x = -6;
-            cabin.position.y = 25.5;
-            car.add(cabin);
+                const cabin = new THREE.Mesh(new THREE.BoxBufferGeometry(33, 12, 24), [
+                    new THREE.MeshLambertMaterial({ map: carFrontTexture }),
+                    new THREE.MeshLambertMaterial({ map: carBackTexture }),
+                    new THREE.MeshLambertMaterial({ color: 0xffffff }), // top
+                    new THREE.MeshLambertMaterial({ color: 0xffffff }), // bottom
+                    new THREE.MeshLambertMaterial({ map: carRightSideTexture }),
+                    new THREE.MeshLambertMaterial({ map: carLeftSideTexture }),
+                ]);
+                cabin.position.x = -6;
+                cabin.position.y = 25.5;
+                car.add(cabin);
+            }
+            else {
+                const cabin = new THREE.Mesh(
+                new THREE.BoxBufferGeometry(33, 12, 24),
+                new THREE.MeshLambertMaterial({ color: 0xffffff })
+                );
+                cabin.material.wireframe = true;
+                cabin.position.x = -6;
+                cabin.position.y = 25.5;
+                car.add(cabin);
+            }
 
             return car;
         }
