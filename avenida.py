@@ -7,10 +7,10 @@ import json
 
 class Semaphore(ap.Agent):
 
-    # Esta clase define a un semaforo.
+    #   Clase que define semaforo dentro de la simulacion
 
     def setup(self):
-        # """ Este metodo se utiliza para inicializar al semaforo. """
+        # Inicializar el samaforo
 
         self.step_time = 0.1         # Tiempo que dura cada paso de la simulacion
 
@@ -19,12 +19,12 @@ class Semaphore(ap.Agent):
         self.state = 0               # Estado del semaforo 0 = verde, 1 = amarillo, 2 = rojo
         self.state_time = 0          # Tiempo que ha durado el semaforo en el estado actual
 
-        self.green_duration = 50     # Tiempo que dura el semaforo en verde
-        self.yellow_duration = 5     # Tiempo que dura el semaforo en amarillo
-        self.red_duration = 60       # Tiempo que dura el semaforo en rojo
+        self.green_duration = 5     # Duracion del semaforo en verde
+        self.yellow_duration = 1    # Duracion del semaforo en amarillo
+        self.red_duration = 6       # Duracion del semaforo en rojo
 
     def update(self):
-        # """ Este mwtodo actualiza el estado del semaforo. """
+        # Actualizar el estado del semaforo
         self.state_time += self.step_time
 
         if self.state == 0:
@@ -42,26 +42,26 @@ class Semaphore(ap.Agent):
             if self.state_time >= self.red_duration:
                 self.state = 0
                 self.state_time = 0
+                self.green_duration = random.randint(20, 30)
 
 
 class Car(ap.Agent):
-    # """
-    #     Esta clase define a un auto.
-    # """
+
+    # Clase que define a un carro dentro de la simulacion
 
     def setup(self):
-        # """ Este metodo se utiliza para inicializar auto. """
+        #   Inicializacion de un carro
         self.step_time = 0.1         # Tiempo que dura cada paso de la simulacion
 
-        self.direction = [1, 0]      # Direccion a la que viaja el auto
+        self.direction = [1, 0]     # Direccion a la que viaja el auto
         self.speed = 0.0             # Velocidad en metros por segundo
         self.max_speed = 30          # Maxima velocidad en metros por segundo
-        self.state = 1               # Car state: 1 = ok, 0 = dead
+        self.state = 1               # Car state: 1 = funcionando, 0 = choque
         self.x = 0
         self.y = 0
 
     def update_position(self):
-        # """ Este metodo se utiliza para inicializar la posicion del auto. """
+        # Inicializar posicion de carro
 
         # Verifica si el auto no ha chocado
         if self.state == 0:
@@ -72,7 +72,7 @@ class Car(ap.Agent):
             self, [self.speed*self.direction[0], self.speed*self.direction[1]])
 
     def update_speed(self):
-        # """ Este mwtodo se utiliza para inicializar la velocidad del auto. """
+        # Definir la velocidad del carro
 
         # Verifica si el auto no ha chocado
         if self.state == 0:
@@ -82,10 +82,13 @@ class Car(ap.Agent):
         p = self.model.avenue.positions[self]
 
         min_car_distance = 1000000
+
+        # Inicializar valor para carro que puede chocar
         crashed_car = self
+
         for car in self.model.cars:
             if car != self:
-                # Verifica si el carro va en la misma direccion
+                # Verifica si el carro va en la misma direccion (Producto punto entre dos vectores positivo significa que apuntan a la misma direccion)
                 dot_p1 = self.direction[0]*car.direction[0] + \
                     self.direction[1]*car.direction[1]
 
@@ -102,7 +105,7 @@ class Car(ap.Agent):
 
                     if min_car_distance > d:
                         min_car_distance = d
-                        if min_car_distance < 2:
+                        if min_car_distance < 20:
                             crashed_car = car
 
         # Obten la distancia al proximo semaforo
@@ -198,16 +201,16 @@ class AvenueModel(ap.Model):
         # Agrega los autos al entorno
         self.avenue.add_agents(self.cars, random=True)
         for k in range(int(c_north/2)):
-            self.avenue.move_to(self.cars[k], [200, 10*(k+1)])
+            self.avenue.move_to(self.cars[k], [200, 75*(k+1)])
         for k in range(int(c_north/2), c_north, 1):
-            self.avenue.move_to(self.cars[k], [270, 10*(k+3 - (c_north/2))])
+            self.avenue.move_to(self.cars[k], [270, 75*(k+3 - (c_north/2))])
 
         for k in range(int(c_south/2)):
             self.avenue.move_to(
-                self.cars[k+c_north], [100, self.p.size - (k+1)*10])
+                self.cars[k+c_north], [100, self.p.size - (k+1)*75])
         for k in range(int(c_south/2), c_south, 1):
             self.avenue.move_to(
-                self.cars[k+c_north], [30, self.p.size - (k+2 - (c_south/2))*10])
+                self.cars[k+c_north], [30, self.p.size - (k+2 - (c_south/2))*75])
 
         # Frame counter
         self.frames = 0
@@ -276,14 +279,15 @@ class AvenueModel(ap.Model):
             outfile.write(json_file)
 
 
+# 1 segundo = 4 steps
 parameters = {
     'step_time': 0.1,    # Tiempo de step
-    'size': 2000,        # Tamano en metros de la avenida
-    'green': 15,          # Duracion de la luz verde
-    'yellow': 5,         # Duracion de la luz amarilla
-    'red': 10,           # Duracion de la luz roja
+    'size': 2500,        # Tamano en metros de la avenida
+    'green': 30,          # Duracion de la luz verde
+    'yellow': 2,         # Duracion de la luz amarilla
+    'red': 24,           # Duracion de la luz roja
     'cars': 20,          # Numero de autos en la simulacion
-    'steps': 1000,       # Numero de pasos de la simulacion
+    'steps': 2500,       # Numero de pasos de la simulacion
 }
 
 model = AvenueModel(parameters)
