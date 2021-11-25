@@ -130,34 +130,45 @@ class Car(ap.Agent):
                     semaphore_state = semaphore.state
 
         # Actualiza la velocidad del auto
+
+        # Carro choca con otro
         if min_car_distance < 20:
             self.speed = 0
             self.state = 1
             crashed_car.speed = 0
             crashed_car.state = 1
 
+        # Se encontro un carro adelante cercano -> frenar mucho
         elif min_car_distance < 70:
             self.speed = np.maximum(self.speed - 250*self.step_time, 0)
 
+        # Se encontro un carro adelante lejano -> frenar poco
         elif min_car_distance < 150:
             self.speed = np.maximum(self.speed - 80*self.step_time, 0)
 
+        # Semaforo cercano y en amarillo -> acelerar
         elif min_semaphore_distance < 60 and semaphore_state == 1:
             self.speed = np.minimum(
                 self.speed + 5*self.step_time, self.max_speed)
 
+        # Semaforo lejano y en amarillo -> frenar
         elif min_semaphore_distance < 120 and semaphore_state == 1:
             self.speed = np.maximum(self.speed - 20*self.step_time, 0)
 
+        # Semaforo en rojo o amarillo, no se encontro carro enfrente, el carro tiene poca velocidad
         elif self.speed <= 10 and min_car_distance == 1000000 and (semaphore_state == 2 or semaphore_state == 1):
+            # Si esta lejos del semaforo -> acelerar poco
             if(min_semaphore_distance > 60 and self.speed != 10):
                 self.speed = np.minimum(self.speed + 50*self.step_time, 10)
+            # Si esta cerca del semaforo -> frenar mucho
             else:
                 self.speed = np.maximum(self.speed - 250*self.step_time, 0)
 
+        # Semaforo en rojo y lejano -> frenar medio
         elif min_semaphore_distance < 200 and semaphore_state == 2:
             self.speed = np.maximum(self.speed - 80*self.step_time, 0)
 
+        # Otro caso -> acelerar poco
         else:
             self.speed = np.minimum(
                 self.speed + 5*self.step_time, self.max_speed)
@@ -274,6 +285,14 @@ class AvenueModel(ap.Model):
         self.frames += 1
 
     def end(self):
+        # Calcular cantidad total de choques
+        choques = 0
+        for car in model.cars:
+            if car.state == 0:
+                choques += 1
+        self.report('Autos chocados', choques)
+
+        # Escribir datos recopilados en archivo JSON
         json_file = json.dumps(self.data)
         with open('simul_data.json', 'w') as outfile:
             outfile.write(json_file)
@@ -284,7 +303,7 @@ parameters = {
     'step_time': 0.1,    # Tiempo de step
     'size': 2500,        # Tamano en metros de la avenida
     'green': 30,          # Duracion de la luz verde
-    'yellow': 2,         # Duracion de la luz amarilla
+    'yellow': 3,         # Duracion de la luz amarilla
     'red': 24,           # Duracion de la luz roja
     'cars': 20,          # Numero de autos en la simulacion
     'steps': 2500,       # Numero de pasos de la simulacion
@@ -292,3 +311,4 @@ parameters = {
 
 model = AvenueModel(parameters)
 results = model.run()
+print(results.reporters)
