@@ -26,7 +26,7 @@
         "use strict";
 
         let renderer, scene, camera, orbitControls, stats, gui, data, dataReady = false, frame = 0;
-        let street, streetLines;
+        let street, streetLines, buildings;
         
         function init(event) {
             // RENDERER ENGINE
@@ -44,6 +44,7 @@
             const scenary = new Scenary();
             const street = new Street(2600, 1000, 130, 1200);
             const streetLines = new StreetLines();
+            const buildings = new Buildings();
 
             // LIGHTS
             var ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -57,18 +58,10 @@
             scene.add(scenary);
             scene.add(street);
             scene.add(streetLines);
+            scene.add(buildings);
 
             // CAMERA (PERSPECTIVE)
-            const fov = 60;    // Field ov view
-            const aspect = window.innerWidth / window.innerHeight;
-            const near = 0.01;
-            const far = 10000.0;
-            camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-            camera.position.set(-100, 100, 300);
-            // CAMERA CONTROLS
-            orbitControls = new OrbitControls(camera, renderer.domElement);
-            //orbitControls.target = model.position;
-            orbitControls.update();
+            camera = new Camera();
 
             // SETUP STATS
             stats = new Stats();
@@ -83,6 +76,28 @@
                 scenary.axes.setVisible(value);
             });
             guiSceneMenu.open();
+            const guiBuildings = gui.addFolder("Buildings");
+            guiBuildings.add(buildings, "textures").setValue(true).name("Textures").listen().onChange(function(value) {
+                buildings.setTextures(value);
+            });
+            guiBuildings.add(buildings, "wireframes").setValue(false).name("Wireframes").listen().onChange(function(value) {
+                buildings.setWireframes(value);
+            });
+            guiBuildings.addColor(buildings, 'color').setValue(buildings.color).name('Color').listen().onChange(function (value) {
+                buildings.setColor(value);
+            });
+            guiSceneMenu.open();
+            // CAMERA-MENU
+            const guiVirtuaCameraMenu = gui.addFolder("Virtual Camera");
+            guiVirtuaCameraMenu.add(camera, "perspectiveView").setValue(camera.perspectiveView).name("Perspective View").listen().onChange(function(value) {
+                camera.setPerspectiveView(value);
+            });
+            guiVirtuaCameraMenu.add(camera, "topView").setValue(camera.topView).name("Top View").listen().onChange(function(value) {
+                camera.setTopView(value);
+            });
+            guiVirtuaCameraMenu.add(camera, "modelInteriorView").setValue(camera.modelInteriorView).name("Model Interior View").listen().onChange(function(value) {
+                camera.setModelInteriorView(value);
+            });
 
             // READ JSON DATA
             readTextFile('./simul_data.json', function(text){
@@ -170,6 +185,18 @@
                     frame++;
                }
            }
+           if(camera){
+                if(camera.modelInteriorView){
+                    var car = scene.getObjectByName(0);
+                    if(car){
+                        camera.position.set(car.position.x, car.position.y + 25, car.position.z+20);
+                        camera.orbitControls.target = new THREE.Vector3(car.position.x, 20, car.position.z + 50);
+                        camera.up.set(0, 1, 0);
+                        camera.orbitControls.update();
+                    }
+                }
+                camera.orbitControls.update();
+           }
         }
 
         function readTextFile(file, callback) {
@@ -192,6 +219,43 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);            
         }, false);
+
+        class Camera extends THREE.PerspectiveCamera {
+            constructor(fov = 60, aspect = window.innerWidth / window.innerHeight, near = 0.01, far = 10000){
+                super(fov, aspect, near, far);
+                // CAMERA CONTROLS
+                this.orbitControls = new OrbitControls(this, renderer.domElement);
+                //orbitControls.target = model.position;
+                this.orbitControls.update();
+                this.perspectiveView = false;
+                this.topView = false;
+                this.frontView = false;
+                this.sideView = false;
+                this.modelInteriorView = false;
+                this.setPerspectiveView();
+            }
+            setPerspectiveView(value = true){
+                this.position.set(-1200, 900, 1250);
+                this.orbitControls.target = new THREE.Vector3(145, 40, 1250);
+                this.up.set(0, 1, 0);
+                this.orbitControls.update();
+            }
+            setTopView(){
+                this.position.set(145,1000,1250);
+                this.orbitControls.target = new THREE.Vector3(145, 0, 1250);
+                this.up.set(1, 0, 0);
+                this.orbitControls.update();
+            }
+            setModelInteriorView(){
+                var car = scene.getObjectByName(0);
+                if(car){
+                    this.position.set(car.position.x, car.position.y + 25, car.position.z+20);
+                    this.orbitControls.target = new THREE.Vector3(car.position.x, 20, car.position.z + 50);
+                    this.up.set(0, 1, 0);
+                    this.orbitControls.update();
+                }
+            }
+        }
 
         class Axes extends THREE.AxesHelper {
             constructor(size = 10, visible = false) {
@@ -406,16 +470,87 @@
         }
 
         class Line extends THREE.Mesh {
-            constructor(xSize = 100, ySize = 100, x, z, rotation = 0) {
+            constructor(xSize = 100, zSize = 100, x, z, rotation = 0, color = 0xffff00) {
                 super();
-                const geometry = new THREE.PlaneGeometry(xSize, ySize);
-                const material = new THREE.MeshBasicMaterial({color: 0xffff00});
+                const geometry = new THREE.PlaneGeometry(xSize, zSize);
+                const material = new THREE.MeshBasicMaterial({color: color});
                 this.mesh = new THREE.Mesh(geometry, material);
                 this.mesh.rotation.x = -Math.PI / 2;
                 this.mesh.rotation.z = rotation * Math.PI / 180;
                 // CHILDREN
                 this.add(this.mesh);
                 this.position.set(x, 1, z);
+            }
+        }
+        class Box extends THREE.Mesh {
+            constructor(x = 0, z = 0, sizeX = 1, sizeY = 1, sizeZ = 1, color = 0x464e51, rotation = 0,){
+                super(new THREE.BoxGeometry(sizeX, sizeY, sizeZ), new THREE.MeshBasicMaterial({color}));
+                this.x = x;
+                this.z = z;
+                this.position.set(x, 0, z);
+                this.rotation.y = rotation * Math.PI / 180;
+            }
+        }
+
+        class TexturedBuilding extends THREE.Mesh {
+            constructor(sizeX = 1, sizeY = 1, sizeZ = 1, x, z, color = 0xffffff, texture = "./textures/building.jpg") {
+                super();
+                this.sizeX = sizeX;
+                this.sizeY = sizeY;
+                this.sizeZ = sizeZ;
+                this.x = x;
+                this.z = z;
+                this.color = color;
+                this.texture = texture;
+                this.textures = true;
+                this.wireFrame = false;
+                this.geometry = new THREE.BoxGeometry(sizeX, sizeY, sizeZ);
+                this.material = [
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({color: color}),
+                         new THREE.MeshBasicMaterial({color: color}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(texture), side: THREE.DoubleSide})
+                        ];
+                this.position.set(x, 0, z);
+                this.setOnFloor();
+            }
+            setOnFloor() {
+                this.geometry.computeBoundingBox();
+                const bBox = this.geometry.boundingBox;
+                this.position.y = -bBox.min.y;
+            }
+
+            setTextures(value = true){
+                this.textures = value;
+                this.remove(this.material);
+                if (value){
+                    this.material = [
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(this.texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(this.texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({color: this.color}),
+                         new THREE.MeshBasicMaterial({color: this.color}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(this.texture), side: THREE.DoubleSide}),
+                         new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load(this.texture), side: THREE.DoubleSide})
+                        ];
+                } else {
+                    this.material = new THREE.MeshBasicMaterial({color: this.color});
+                }
+                this.add(this.material);
+            }
+
+            setWireframe(value = true){
+                if (!this.texures){
+                    this.wireFrame = value;
+                    this.material.wireframe = value;
+                }
+            }
+
+            setColor(hexColor) {
+                if (!this.texures){
+                    this.material.color.setHex(hexColor);
+                }
             }
         }
 
@@ -426,11 +561,59 @@
 
                 this.lines.push(new Line(2600, 20, 145, 1200, 90));
 
+                this.lines.push(new Line(60, 15, 285, 1250, 90));
+                this.lines.push(new Line(60, 15, 250, 1250, 90));
+                this.lines.push(new Line(60, 15, 215, 1250, 90));
+                this.lines.push(new Line(60, 15, 180, 1250, 90));
+                this.lines.push(new Line(60, 15, 110, 1250, 90));
+                this.lines.push(new Line(60, 15, 75, 1250, 90));
+                this.lines.push(new Line(60, 15, 40, 1250, 90));
+                this.lines.push(new Line(60, 15, 5, 1250, 90));
+
+                this.lines.push(new Box(-50, 1200, 2600, 15, 80, 0x464e51, 90));
+                this.lines.push(new Box(340, 1200, 2600, 15, 80, 0x464e51, 90));
+
                 for(let i = 0; i < this.lines.length; i++) {
                     this.add(this.lines[i]);
                 }
             }
         }
+
+        class Buildings extends THREE.Group {
+            constructor(color = 0x808080) {
+                super();
+                this.textures = true;
+                this.wireframes = false;
+                this.buildings = [];
+                this.color = color;
+                this.buildings.push(new TexturedBuilding(200, 600, 250, 500, 800, color));
+                this.buildings.push(new TexturedBuilding(150, 400, 200, 500, 1400, color));
+                this.buildings.push(new TexturedBuilding(200, 600, 250, 500, 1800, color, "./textures/building2.jpg"));
+                this.buildings.push(new TexturedBuilding(200, 700, 350, 500, 300, color, "./textures/building2.jpg"));
+
+                for(let i = 0; i < this.buildings.length; i++) {
+                    this.add(this.buildings[i]);
+                }
+            }
+            setTextures(value = true){
+                for(let i = 0; i < this.buildings.length; i++) {
+                    this.buildings[i].setTextures(value);
+                }
+            }
+            setWireframes(value = true){
+                for(let i = 0; i < this.buildings.length; i++) {
+                    this.buildings[i].setWireframe(value);
+                }
+            }
+            setColor(value){
+                for(let i = 0; i < this.buildings.length; i++) {
+                    this.buildings[i].setColor(value);
+                }
+            }
+        }
+
+
+
 
         class Scenary extends THREE.Group {
             constructor(size = 1000) {
